@@ -1,0 +1,272 @@
+---------Temp table----------
+
+CREATE TABLE xx_ar_sample_data (
+    operating_unit                     VARCHAR2(100),
+    class                              VARCHAR2(100),
+    cust_trx_type_name                 VARCHAR2(100),
+    legal_entity_name                  VARCHAR2(100),
+    trx_date                           DATE,
+    gl_date                            VARCHAR2(100),
+    fob_point                          VARCHAR2(100),
+    invoice_currency_code              VARCHAR2(100),
+    orig_system_bill_to_customer_num   VARCHAR2(100),
+    bill_to_customer_name              VARCHAR2(100),
+    bill_to_customer_num               VARCHAR2(100),
+    bill_to_address                    VARCHAR2(600),
+    location                           VARCHAR2(100),
+    paying_customer_name               VARCHAR2(100),
+    paying_customer_number             VARCHAR2(100),
+    location2                          VARCHAR2(100),
+    term_name                          VARCHAR2(100),
+    term_due_date                      DATE,
+    remit_to_address                   VARCHAR2(100),
+    ship_via                           VARCHAR2(100),
+    line_number                        VARCHAR2(100),
+    description                        VARCHAR2(100),
+    unit_selling_price                 VARCHAR2(100),
+    uom_code                           VARCHAR2(100),
+    line_type                          VARCHAR2(100),
+    tax_invoice_date                   VARCHAR2(100),
+    taxable_amount                     VARCHAR2(100),
+    tax_invoice_number                 VARCHAR2(100),
+    tax_point_basis                    VARCHAR2(100)
+);
+
+
+========================================================
+
+DECLARE
+    CURSOR c1 IS
+        SELECT
+            a.*,
+            62934 cust_trx_type_id,
+            TO_CHAR(
+                trx_date,
+                'DD-MON-YYYY'
+            ) trx_date1,
+            TO_CHAR(
+                term_due_date,
+                'DD-MON-YYYY'
+            ) term_due_date1,
+            to_number(substr(
+                tax_invoice_number,
+                3,
+                6
+            ) ) tax_invoice_number1,
+            (
+                SELECT
+                    cust_account_id
+                FROM
+                    hz_cust_accounts_all a,
+                    hz_parties b
+                WHERE
+                        a.party_id = b.party_id
+                    AND
+                        upper(party_name) = a.bill_to_customer_name
+            ) orig_system_bill_customer_id,
+            (
+                SELECT
+                    c.cust_acct_site_id
+                FROM
+                    hz_cust_accounts_all a,
+                    hz_parties b,
+                    hz_cust_acct_sites_all c
+                WHERE
+                        a.party_id = b.party_id
+                    AND
+                        a.cust_account_id = c.cust_account_id
+                    AND
+                        upper(party_name) = a.bill_to_customer_name
+            ) orig_system_bill_address_id,
+            (
+                SELECT
+                    cust_account_id
+                FROM
+                    hz_cust_accounts_all a,
+                    hz_parties b
+                WHERE
+                        a.party_id = b.party_id
+                    AND
+                        upper(party_name) = a.bill_to_customer_name
+            ) orig_system_ship_customer_id,
+            (
+                SELECT
+                    c.cust_acct_site_id
+                FROM
+                    hz_cust_accounts_all a,
+                    hz_parties b,
+                    hz_cust_acct_sites_all c
+                WHERE
+                        a.party_id = b.party_id
+                    AND
+                        a.cust_account_id = c.cust_account_id
+                    AND
+                        upper(party_name) = a.bill_to_customer_name
+            ) orig_system_ship_address_id,
+            (
+                SELECT
+                    term_id
+                FROM
+                    ra_terms_tl
+                WHERE
+                    upper(name) = upper('IMMIDIATE')
+            ) term_id
+        FROM
+            xx_ar_sample_data a
+        WHERE
+                1 = 1
+--and TAX_INVOICE_NUMBER in ( 'DR08337',
+--'DR08365')
+            AND NOT
+                EXISTS (
+                    SELECT
+                        1
+                    FROM
+                        ra_customer_trx_all rct
+                    WHERE
+                            rct.org_id = 346
+                        AND
+                            rct.trx_number = substr(
+                                a.tax_invoice_number,
+                                3,
+                                6
+                            )
+                );
+
+BEGIN
+    FOR i IN c1 LOOP
+        INSERT INTO ra_interface_lines_all (
+            interface_line_id,
+            batch_source_name,
+            line_type,
+            cust_trx_type_id,
+            trx_number,
+            document_number,
+            trx_date,
+            gl_date,
+            currency_code,
+            term_id,
+            orig_system_ship_customer_id,
+            orig_system_ship_address_id,
+            orig_system_bill_customer_id,
+            orig_system_bill_address_id,
+            orig_system_sold_customer_id,
+            paying_customer_id,
+            paying_site_use_id,
+            quantity,
+            amount,
+            description,
+            conversion_type,
+            conversion_rate,
+--CONVERSION_date,
+            org_id,
+            set_of_books_id,
+            created_by,
+            creation_date,
+            last_updated_by,
+            last_update_date,
+            last_update_login,
+            header_attribute1,
+            header_attribute2,
+            header_attribute7,
+            header_attribute8,
+            header_attribute3,
+            interface_line_attribute1,/*,INTERFACE_LINE_ATTRIBUTE2,INTERFACE_LINE_ATTRIBUTE3,INTERFACE_LINE_ATTRIBUTE4,INTERFACE_LINE_ATTRIBUTE5,INTERFACE_LINE_ATTRIBUTE6,INTERFACE_LINE_ATTRIBUTE7,INTERFACE_LINE_ATTRIBUTE8,INTERFACE_LINE_ATTRIBUTE9,INTERFACE_LINE_ATTRIBUTE10,INTERFACE_LINE_ATTRIBUTE11,INTERFACE_LINE_ATTRIBUTE12,
+INTERFACE_LINE_ATTRIBUTE13,INTERFACE_LINE_ATTRIBUTE14,INTERFACE_LINE_ATTRIBUTE15,*/
+            interface_line_context,
+            unit_selling_price,
+            quantity_ordered,
+            fob_point,
+            uom_code
+        ) VALUES (
+            ra_customer_trx_lines_s.NEXTVAL,
+            'MIGRATION SOURCE',
+            'LINE',
+            i.cust_trx_type_id,
+--'DRA MIGRATION INV',
+            substr(
+                i.tax_invoice_number,
+                3,
+                6
+            ),
+            substr(
+                i.tax_invoice_number,
+                3,
+                6
+            ),
+            i.trx_date1,
+            '31-MAR-23',--sysdate    ,---gl date,
+            i.invoice_currency_code,
+            10001,-- term Net 30 ,
+--l_term_name,
+            i.orig_system_ship_customer_id,
+            i.orig_system_ship_address_id,
+            i.orig_system_bill_customer_id,
+            i.orig_system_bill_address_id,
+            i.orig_system_bill_customer_id,
+            i.orig_system_bill_customer_id,
+            i.orig_system_bill_address_id,
+            1,
+--40000
+            i.taxable_amount,
+            i.description,
+            'User',--DECODE(I.INVOICE_CURRENCY_CODE,'INR','User','Corporate'),
+            1,--DECODE(I.INVOICE_CURRENCY_CODE,'INR','1',null),
+--decode(I.INVOICE_CURRENCY_CODE,'INR',NULL,I.EXCHANGE_DATE),
+            '346',
+            2081,  --SET_OF_BOOKS_ID,
+            1110,
+            SYSDATE,
+            1110,
+            SYSDATE,
+            -1,
+            'SALES',
+            '107',
+            '003',
+            '000009',
+            i.tax_invoice_number,
+            i.tax_invoice_number,
+            'LEGAZY',
+            i.taxable_amount,
+            1,
+            i.fob_point,
+            i.uom_code
+        );
+
+        INSERT INTO ra_interface_distributions_all (
+            interface_line_id,
+            account_class,
+            amount,
+            code_combination_id,
+            percent,
+            org_id,
+            created_by,
+            creation_date,
+            last_updated_by,
+            last_update_date,
+            last_update_login
+        ) VALUES (
+            ra_customer_trx_lines_s.CURRVAL,
+            'REV',
+            i.taxable_amount,
+            '4045257',
+            100,
+            '346',
+            1131,
+            SYSDATE,
+            1131,
+            SYSDATE,
+            -1
+        );
+
+        COMMIT;
+    END LOOP;
+END;
+-----------------------------------------------------------------------------------
+
+CONCURRENT PROGRAM                              RESPONSIBILITY
+---------------------                          -----------------        
+
+Autoinvoice Master Program                  DRA INDIA LOCAL RECEIVABLES
+
+

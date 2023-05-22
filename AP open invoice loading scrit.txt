@@ -1,0 +1,193 @@
+CREATE TABLE xx_ap_sample_data (
+    operating_unit               VARCHAR2(100),
+    invoice_type_lookup_code     VARCHAR2(100),
+    document_category_name       VARCHAR2(200),
+    vendor_name                  VARCHAR2(100),
+    vendor_num                   VARCHAR2(100),
+    vendor_site_code             VARCHAR2(100)
+--,DESCRIPTION VARCHAR2(100)
+    ,
+    invoice_num                  VARCHAR2(100),
+    invoice_date                 VARCHAR2(100),
+    invoice_amount               VARCHAR2(100)
+--,DOC_CATEGORY_CODE VARCHAR2(100)
+    ,
+    gl_date                      VARCHAR2(100),
+    invoice_currency_code        VARCHAR2(100),
+    payment_currency_code        VARCHAR2(100),
+    payment_method_lookup_code   VARCHAR2(100),
+    terms_date                   VARCHAR2(100),
+    terms_name                   VARCHAR2(100)
+);
+/
+
+SET SERVEROUTPUT ON;
+
+DECLARE
+    CURSOR c1 IS
+        SELECT
+            a.*,
+            (
+                SELECT
+                    vendor_site_id
+                FROM
+                    ap_suppliers a,
+                    ap_supplier_sites_all b
+                WHERE
+                        a.vendor_id = b.vendor_id
+                    AND
+                        org_id = 346
+                    AND
+                        upper(vendor_name) = upper(a.vendor_name)
+                    AND
+                        segment1 = a.vendor_num
+            ) vendor_site_id,
+            (
+                SELECT
+                    ap1.vendor_id
+                FROM
+                    ap_suppliers ap1,
+                    ap_supplier_sites_all b
+                WHERE
+                        ap1.vendor_id = b.vendor_id
+                    AND
+                        org_id = 346
+                    AND
+                        upper(vendor_name) = upper(a.vendor_name)
+                    AND
+                        segment1 = a.vendor_num
+            ) vendor_id,
+            (
+                SELECT
+                    vendor_site_code
+                FROM
+                    ap_suppliers a,
+                    ap_supplier_sites_all b
+                WHERE
+                        a.vendor_id = b.vendor_id
+                    AND
+                        org_id = 346
+                    AND
+                        upper(vendor_name) = upper(a.vendor_name)
+                    AND
+                        segment1 = a.vendor_num
+            ) new_vendor_site_code
+        FROM
+            xx_ap_sample_data a
+        WHERE
+                1 = 1 --AND A.INVOICE_NUM = 'EITN2022366'
+            AND
+                invoice_num NOT IN (
+                    'RD3300000146','RD3300000134'
+                )
+            AND NOT
+                EXISTS (
+                    SELECT
+                        1
+                    FROM
+                        ap_invoices_all ab
+                    WHERE
+                            ab.invoice_num = a.invoice_num
+                        AND
+                            org_id = 346
+                );
+
+BEGIN
+    FOR i IN c1 LOOP
+--AA := AA + 1;
+        INSERT INTO ap_invoices_interface (
+            invoice_id,
+            invoice_num,
+            description,
+            invoice_type_lookup_code,
+            invoice_date,
+            gl_date,
+            vendor_id,
+            vendor_num,
+            vendor_site_code,
+            invoice_amount,
+            invoice_currency_code,
+            terms_name,
+            doc_category_code,
+-- CALC_TAX_DURING_IMPORT_FLAG,
+            source,
+            group_id,
+            org_id,
+            last_update_date,
+            last_updated_by,
+            creation_date,
+            created_by,
+-- exchange_rate,
+            exchange_date,
+            exchange_rate_type,
+            terms_date,
+            attribute14,
+            attribute10,
+            payment_method_code
+        ) VALUES (
+            ap_invoices_interface_s.NEXTVAL,
+            i.invoice_num,
+            i.description,
+            'STANDARD',
+            i.invoice_date,
+            '31-MAR-2023',
+            i.vendor_id,
+            i.vendor_num,
+            i.new_vendor_site_code,
+            i.invoice_amount,
+            i.invoice_currency_code,
+            i.terms_name,
+            'DR1_Standard Invoice',
+            'ERS',
+            11223344,
+            346,
+            SYSDATE,
+            112,
+            SYSDATE,
+            112,
+            NULL,
+            NULL,---DECODE(I.EXCHANGE_RATE_TYPE,'1000','Imports',i.EXCHANGE_RATE_TYPE),
+            i.invoice_date,
+            NULL,
+            6035,
+            'EFT-01'
+        );
+
+        COMMIT;
+-- select distinct line_type_lookup_code from ap_invoice_lines_interface
+        INSERT INTO ap_invoice_lines_interface (
+            invoice_id,
+            invoice_line_id,
+            line_number,
+            line_type_lookup_code,
+            line_group_number,
+            amount,
+            accounting_date,
+            dist_code_concatenated,
+            org_id,
+            last_update_date,
+            last_updated_by,
+            creation_date,
+            created_by
+        ) VALUES (
+            ap_invoices_interface_s.CURRVAL,
+            ap_invoice_lines_interface_s.NEXTVAL,
+            1,
+            'ITEM',
+            NULL,
+            i.invoice_amount,
+            SYSDATE,
+            '901.000.900024.000.000000.000.0000',
+            346,
+            SYSDATE,
+            112,
+            SYSDATE,
+            112
+        );
+
+        dbms_output.put_line('INVOICE ID :' || ' - ' || ap_invoices_interface_s.currval);
+        COMMIT;
+    END LOOP;
+
+    dbms_output.put_line('Completed Successfully');
+END;

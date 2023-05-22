@@ -1,0 +1,27 @@
+create table xxcapl_supplier_master ( organization_name	VARCHAR2(30),
+Supplier_Number	VARCHAR2(50),
+vendor_name	 VARCHAR2(100),      --
+Supplier_Type	VARCHAR2(30),
+legacy_name	VARCHAR2(30),
+currency_code	VARCHAR2(10),
+match_option	VARCHAR2(10),
+terms_name	VARCHAR2(30),
+terms_date_basis VARCHAR2(30),	
+payment_method_lookup_code	VARCHAR2(40),
+payment_currency_code VARCHAR2(30),
+attribute_category	VARCHAR2(30),
+vendor_site_code	VARCHAR2(30),
+country VARCHAR2(30),
+address_line1 VARCHAR2(80)	,
+address_line2	VARCHAR2(80),
+address_line3	VARCHAR2(80),
+address_line4	VARCHAR2(80),
+state	VARCHAR2(30),
+City	VARCHAR2(30),
+Postal_pin	VARCHAR2(20),
+Liability_Account VARCHAR2(45),        --
+Prepayment_Account	VARCHAR2(45),       ---
+Bills_Payable_Account VARCHAR2(45),	   ---
+E_Invoice		VARCHAR2(30),	    ---	
+phone	VARCHAR2(15),
+email_address VARCHAR2(70));  

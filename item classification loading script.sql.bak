@@ -1,0 +1,217 @@
+CREATE TABLE XX_ITEM_CLASSIFICATION_DATA (
+Organization VARCHAR2(100)
+,Item_Name VARCHAR2(100)
+,Template VARCHAR2(100)
+,Item_classification VARCHAR2(100)
+,Tax_Regime_Name VARCHAR2(100)
+,RECOVERABLE VARCHAR2(100)
+,TARIFF_HEAD VARCHAR2(100)
+,TARIFF_NO VARCHAR2(100)
+,TAX_STATUS VARCHAR2(100)
+,Reporting_usage VARCHAR2(100)
+,Regime_name VARCHAR2(100)
+,Reporting_Type VARCHAR2(100)
+,Reporting_code VARCHAR2(100)
+,Description VARCHAR2(100)
+,Start_Date VARCHAR2(100));
+
+
+==========================================================================================================================================
+
+--/* Formatted on 2031/04/01 01:43  */
+SET SERVEROUTPUT ON;
+DECLARE
+   p_hdr_rec      jai_item_templ_hdr%ROWTYPE;
+   p_dtl_rec      jai_item_templ_dtls%ROWTYPE;
+   p_assoc_rec    jai_reporting_associations%ROWTYPE;
+   p_err_msg      VARCHAR2 (2000);
+   process_flag   VARCHAR2 (1);
+   v_organization_id number;
+
+   CURSOR c1_hdr
+   IS
+   
+SELECT DISTINCT A.ORGANIZATION, A.ITEM_NAME, A.TEMPLATE, A.ITEM_CLASSIFICATION,A.TAX_REGIME_NAME, A.RECOVERABLE, A.TARIFF_HEAD, A.TARIFF_NO, A.TAX_STATUS
+      ,B.INVENTORY_ITEM_ID ,10001 regime_id FROM XX_ITEM_CLASSIFICATION_DATA A,MTL_SYSTEM_ITEMS_B B
+WHERE 1=1 AND SEGMENT1 = ITEM_NAME
+--and ITEM_NAME = 'TS04400400027038'
+ AND B.ORGANIZATION_ID = 367
+and  exists (select 1 from JAI_ITEM_TEMPL_HDR D where D.inventory_item_id = B.INVENTORY_ITEM_ID  and D.organization_id =367);  --648  Rows
+
+   CURSOR c2_lines (p_item_id number)
+   IS
+  SELECT DISTINCT A.ITEM_NAME, A.REPORTING_USAGE
+  ,decode(a.REPORTING_USAGE,'Legal Reporting','LR','Tax Determination','TD') REPORTING_USAGE_CODE,
+  A.REGIME_NAME, A.REPORTING_TYPE, A.REPORTING_CODE, 
+  (select REPORTING_CODE_DESCRIPTION from JAI_REPORTING_CODES 
+where REPORTING_CODE = A.REPORTING_CODE 
+and REPORTING_TYPE_ID  = decode(a.REPORTING_TYPE,'HSN Code Type for GST',10000,'Item Goods Service Default',10080) ) REPORTING_CODE_DESCRIPTION,
+  A.DESCRIPTION, A.START_DATE, B.INVENTORY_ITEM_ID
+  ,decode(a.REPORTING_TYPE,'HSN Code Type for GST',10000,'Item Goods Service Default',10080) reporting_type_id ,10001 regime_id
+  FROM XX_ITEM_CLASSIFICATION_DATA A,MTL_SYSTEM_ITEMS_B B
+WHERE 1=1 AND SEGMENT1 = ITEM_NAME
+ AND B.ORGANIZATION_ID = 367
+ AND B.INVENTORY_ITEM_ID =p_item_id  ;
+BEGIN
+--v_organization_id := 6534;
+
+   FOR i IN c1_hdr
+   LOOP
+      process_flag := NULL;
+      p_err_msg := NULL;
+--DBMS_OUTPUT.put_line ('Updating Header');
+      BEGIN
+         p_hdr_rec.template_hdr_id := jai_item_templ_hdr_s.NEXTVAL;
+         p_hdr_rec.template_name := NULL;
+         p_hdr_rec.template_desc := NULL;
+         p_hdr_rec.entity_id := i.inventory_item_id;
+         p_hdr_rec.entity_type_code := 'ITEM';
+         p_hdr_rec.item_classification := 'RMIN';
+         p_hdr_rec.inventory_item_id := i.inventory_item_id;
+         p_hdr_rec.organization_id :=367; -- v_organization_id;
+         p_hdr_rec.creation_date := SYSDATE;
+         p_hdr_rec.created_by := -1;
+         p_hdr_rec.last_update_date := SYSDATE;
+         p_hdr_rec.last_update_login := -1;
+         p_hdr_rec.last_updated_by := -1;
+         p_hdr_rec.record_type_code := 'DEFINED';
+         jai_item_classification_pkg.insert_item_class_hdr (p_hdr_rec);
+      EXCEPTION
+         WHEN OTHERS
+         THEN
+         DBMS_OUTPUT.put_line ('Upload Header Error');
+            process_flag := 'E';
+            p_err_msg := 'Error While creating Classification ';
+      END;
+
+      COMMIT;
+
+      IF process_flag IS NULL
+      THEN
+--         FOR j IN c2_lines(I.item_code , I.organization_name) 
+--         LOOP
+         
+--         DBMS_OUTPUT.put_line ('Updating Lines');
+            BEGIN
+               p_dtl_rec.template_dtl_id := jai_item_templ_dtls_s.NEXTVAL;
+               p_dtl_rec.template_hdr_id := jai_item_templ_hdr_s.CURRVAL;
+               p_dtl_rec.attribute_code := 'RECOVERABLE';
+               p_dtl_rec.attribute_value := i.RECOVERABLE;
+               p_dtl_rec.regime_id := i.regime_id;       ------------needed
+               p_dtl_rec.copied_from_template_id := NULL;
+               p_dtl_rec.user_overridden_flag := NULL;
+               p_dtl_rec.applicable_flag := 'Y';
+               p_dtl_rec.creation_date := SYSDATE;
+               p_dtl_rec.created_by := -1;
+               p_dtl_rec.last_update_date := SYSDATE;
+               p_dtl_rec.last_update_login := -1;
+               p_dtl_rec.last_updated_by := -1;
+               p_dtl_rec.record_type_code := 'DEFINED';
+               jai_item_classification_pkg.insert_item_class_dtls (p_dtl_rec);
+
+               p_dtl_rec.template_dtl_id := jai_item_templ_dtls_s.NEXTVAL;
+               p_dtl_rec.template_hdr_id := jai_item_templ_hdr_s.CURRVAL;
+               p_dtl_rec.attribute_code := 'TARIFF_HEAD';
+               p_dtl_rec.attribute_value := i.TARIFF_HEAD;
+               p_dtl_rec.regime_id := i.regime_id;
+               p_dtl_rec.copied_from_template_id := NULL;
+               p_dtl_rec.user_overridden_flag := NULL;
+               p_dtl_rec.applicable_flag := 'Y';
+               p_dtl_rec.creation_date := SYSDATE;
+               p_dtl_rec.created_by := -1;
+               p_dtl_rec.last_update_date := SYSDATE;
+               p_dtl_rec.last_update_login := -1;
+               p_dtl_rec.last_updated_by := -1;
+               p_dtl_rec.record_type_code := 'DEFINED';
+               jai_item_classification_pkg.insert_item_class_dtls (p_dtl_rec);
+
+               p_dtl_rec.template_dtl_id := jai_item_templ_dtls_s.NEXTVAL;
+               p_dtl_rec.template_hdr_id := jai_item_templ_hdr_s.CURRVAL;
+               p_dtl_rec.attribute_code := 'TARIFF_NO';
+               p_dtl_rec.attribute_value := i.TARIFF_NO;
+               p_dtl_rec.regime_id := i.regime_id;
+               p_dtl_rec.copied_from_template_id := NULL;
+               p_dtl_rec.user_overridden_flag := NULL;
+               p_dtl_rec.applicable_flag := 'Y';
+               p_dtl_rec.creation_date := SYSDATE;
+               p_dtl_rec.created_by := -1;
+               p_dtl_rec.last_update_date := SYSDATE;
+               p_dtl_rec.last_update_login := -1;
+               p_dtl_rec.last_updated_by := -1;
+               p_dtl_rec.record_type_code := 'DEFINED';
+               jai_item_classification_pkg.insert_item_class_dtls (p_dtl_rec);
+
+               p_dtl_rec.template_dtl_id := jai_item_templ_dtls_s.NEXTVAL;
+               p_dtl_rec.template_hdr_id := jai_item_templ_hdr_s.CURRVAL;
+               p_dtl_rec.attribute_code := 'TAX_STATUS';
+               p_dtl_rec.attribute_value := i.TAX_STATUS;
+               p_dtl_rec.regime_id := i.regime_id;
+               p_dtl_rec.copied_from_template_id := NULL;
+               p_dtl_rec.user_overridden_flag := NULL;
+               p_dtl_rec.applicable_flag := 'Y';
+               p_dtl_rec.creation_date := SYSDATE;
+               p_dtl_rec.created_by := -1;
+               p_dtl_rec.last_update_date := SYSDATE;
+               p_dtl_rec.last_update_login := -1;
+               p_dtl_rec.last_updated_by := -1;
+               p_dtl_rec.record_type_code := 'DEFINED';
+               jai_item_classification_pkg.insert_item_class_dtls (p_dtl_rec);
+
+               COMMIT;
+            EXCEPTION
+               WHEN OTHERS
+               THEN
+               DBMS_OUTPUT.put_line ('Upload Lines Error');
+                  p_err_msg :=
+                        p_err_msg
+                     || 'Error while inserting item_class_dtls'
+                     || 'SQLERRM';
+            ---------end of item attribute  s.
+            END;
+--        DBMS_OUTPUT.put_line ('Updating Association'||j.reporting_type||j.rep_usage);
+            --TO create association
+         FOR j IN c2_lines(i.inventory_item_id) 
+         LOOP
+            BEGIN
+               p_assoc_rec.reporting_association_id :=
+                                         jai_reporting_associations_s.NEXTVAL;
+               p_assoc_rec.reporting_type_id := j.reporting_type_id;          ------------needed
+               p_assoc_rec.reporting_type_name := j.REPORTING_TYPE;
+               p_assoc_rec.reporting_usage :=j.REPORTING_USAGE_CODE;-- j.rep_usage;
+               p_assoc_rec.reporting_code_description :=j.REPORTING_CODE_DESCRIPTION ;
+               p_assoc_rec.reporting_code := j.REPORTING_CODE;
+               p_assoc_rec.entity_code := 'ITEM';
+               p_assoc_rec.entity_id := jai_item_templ_hdr_s.CURRVAL;
+               p_assoc_rec.entity_source_table := 'JAI_ITEM_TEMPL_HDR';
+               p_assoc_rec.effective_from := j.START_DATE;
+               p_assoc_rec.creation_date := SYSDATE;
+               p_assoc_rec.created_by := -1;
+               p_assoc_rec.last_update_date := SYSDATE;
+               p_assoc_rec.last_update_login := '-1';
+               p_assoc_rec.last_updated_by := -1;
+               p_assoc_rec.record_type_code := 'DEFINED';
+               p_assoc_rec.regime_id := i.regime_id;
+
+               apps.jai_reporting_pkg.insert_report_assoc (p_assoc_rec);
+            EXCEPTION
+               WHEN OTHERS
+               THEN
+               DBMS_OUTPUT.put_line ('Error Association'||SQLERRM);
+                  p_err_msg :=
+                        p_err_msg
+                     || 'Error while inserting item_class_dtls'
+                     || 'SQLERRM';
+            ---------end of item attributes.
+            END;
+         END LOOP;
+      END IF;
+      
+      commit;
+   END LOOP;
+--   COMMIT;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      DBMS_OUTPUT.put_line ('Exception in Main unit ' || SQLERRM);
+END;
+

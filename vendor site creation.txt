@@ -1,0 +1,105 @@
+SET SERVEROUTPUT ON;
+
+DECLARE
+    l_vendor_site_rec   ap_vendor_pub_pkg.r_vendor_site_rec_type;
+    lc_return_status    VARCHAR2(10);
+    ln_msg_count        NUMBER;
+    lc_msg_data         VARCHAR2(1000);
+    ln_vendor_site_id   NUMBER;
+    ln_party_site_id    NUMBER;
+    ln_location_id      NUMBER;
+--
+    CURSOR c1 IS
+        SELECT
+            a.*,
+            b.vendor_id
+        FROM
+            xxcapl_supplier_master_1 a,
+            ap_suppliers b
+        WHERE
+                a.vendor_name = b.vendor_name
+            AND
+                a.organization_name IN (
+                    SELECT
+                        name
+                    FROM
+                        hr_operating_units
+                )
+            AND
+                a.supplier_type IN (
+                    SELECT
+                        vendor_type_lookup_code
+                    FROM
+                        ap_suppliers
+                )
+            AND
+                a.payment_currency_code IN (
+                    SELECT
+                        payment_currency_code
+                    FROM
+                        ap_suppliers
+                );
+
+BEGIN
+    FOR i IN c1 LOOP
+         -- ---------------
+         -- Required 
+         -- ---------------
+         
+     -- l_vendor_site_rec.accts_pay_code_combination_id := 3881298;   --11555794; 
+     -- l_vendor_site_rec.prepay_code_combination_id    := 3881294;
+        l_vendor_site_rec.vendor_id := i.vendor_id;
+        l_vendor_site_rec.vendor_site_code := i.city;
+        l_vendor_site_rec.address_line1 := i.address_line1;
+        l_vendor_site_rec.address_line2 := i.address_line2;
+        l_vendor_site_rec.address_line3 := i.address_line3;
+        l_vendor_site_rec.city := i.city;
+        l_vendor_site_rec.state := i.state;
+        l_vendor_site_rec.zip := i.postal_pin;
+        l_vendor_site_rec.country := 'IN';
+        l_vendor_site_rec.org_id := 346;
+      --  l_vendor_site_rec.payment_currency_code    :=i.PAYMENT_CURRENCY_CODE;
+       -- l_vendor_site_rec.TERMS_DATE_BASIS   :=i.TERMS_DATE_BASIS;
+        l_vendor_site_rec.email_address := i.email_address;
+        l_vendor_site_rec.phone := i.phone;
+        l_vendor_site_rec.default_terms_id := 10003;
+--l_vendor_site_rec.ext_payee_rec.default_pmt_method :=i.PAYMENT_METHOD_LOOKUP_CODE;  --'ETF-01';
+       -- l_vendor_site_rec.PAYMENT_METHOD_LOOKUP_CODE  := i.PAYMENT_METHOD_LOOKUP_CODE;
+ --
+        -- -------------- 
+        -- Optional 
+        -- --------------
+        l_vendor_site_rec.purchasing_site_flag := 'Y';
+        l_vendor_site_rec.pay_site_flag := 'Y';
+        l_vendor_site_rec.rfq_only_site_flag := 'Y';
+ --
+        pos_vendor_pub_pkg.create_vendor_site( 
+              -- ------------------------------
+              -- Input data elements
+              -- ------------------------------
+            p_vendor_site_rec   => l_vendor_site_rec,
+              -- ---------------------------------
+              -- Output data elements
+              -- ---------------------------------
+            x_return_status     => lc_return_status,
+            x_msg_count         => ln_msg_count,
+            x_msg_data          => lc_msg_data,
+            x_vendor_site_id    => ln_vendor_site_id,
+            x_party_site_id     => ln_party_site_id,
+            x_location_id       => ln_location_id
+        );
+
+        dbms_output.put_line('return_status: ' || lc_return_status);
+        dbms_output.put_line('msg_data: ' || lc_msg_data);
+        dbms_output.put_line('vendor_id: ' || ln_vendor_site_id);
+        dbms_output.put_line('party_id: ' || ln_party_site_id);
+        dbms_output.put_line('location_id: ' || ln_location_id);
+ --
+        COMMIT;
+    END LOOP;
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        dbms_output.put_line(sqlerrm);
+END;
+/
